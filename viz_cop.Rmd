@@ -9,7 +9,7 @@ output: html_document
 #Loading packages 
 
 library(pacman) 
-p_load(dplyr, purrr, stringr, tidyr, readxl, writexl, ggplot2, zipcodeR)
+p_load(dplyr, purrr, stringr, tidyr, readxl, writexl, ggplot2, zipcodeR, ggmap, RColorBrewer, leaflet, maps, sf, htmlwidgets)
 
 ```
 
@@ -21,17 +21,118 @@ prop_race_district <- read_excel("/Users/mmercadodiaz/Documents/CoP /Exports/She
 View(prop_race_district)
 ```
 
+```{r, eval= FALSE, echo=FALSE}
 
 prop_race_district %>%
-ggplot(prop_race_district, mapping=aes(x=districtoccur, 
-  outline = FALSE, fill = race)) + 
-  geom_histogram(stat = "count") +
-  ylab("Arrest Rates") +
+  mutate(
+    race = as.factor(race),
+    districtoccur = as.factor(districtoccur)
+  ) %>%
+  ggplot(aes(x = districtoccur, y = arrest_rate, fill = race)) +
+  geom_col(position = "stack") +
+  ylab("Arrest Rate") +
   xlab("District") +
-  geom_density(stat = "count") + 
-  ggtitle("Arrest Rates by Race and Distict") +
-  theme(plot.title = element_text(hjust = 0.5)) +
-  scale_fill_viridis_d(discrete=TRUE, option="A")
+  labs(fill='Racial Categories') +
+  ggtitle("Arrest Rates by Race and District") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r, eval= FALSE, echo=FALSE}
+
+prop_race_district %>%
+  mutate(
+    race = as.factor(race),
+    districtoccur = as.factor(districtoccur)
+  ) %>%
+  ggplot(aes(x = districtoccur, y = total_arrests, fill = race)) +
+  geom_col(position = "stack") +
+  ylab("Arrest Count") +
+  xlab("District") +
+  labs(fill='Racial Categories') +
+  ggtitle("Arrest Counts by Race and District") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
   
-  
-  
+```{r, eval= FALSE, echo=FALSE}
+#Loading data
+
+coord_race_district <- read_excel("/Users/mmercadodiaz/Documents/CoP /Exports/Sheets/race_props_lat_long.xlsx")
+View(coord_race_district)
+```
+
+```{r, eval= FALSE, echo=FALSE}
+register_stadiamaps("64893b6b-557b-440a-aebb-b4e5cef748c9", write = TRUE)
+
+philly_map_bounds <- c(left = -75.4067, bottom = 39.8560, right = -74.8677, top = 40.0959)
+
+coords.map.philly <- get_stadiamap(philly_map_bounds, zoom = 12, maptype = "stamen_toner_lite")
+
+cop.coords.map <- ggmap(coords.map.philly, extent="panel", legend="none") + 
+                  ylab("Latitude") +
+                  xlab("Longitude") + 
+                  ggtitle("Police Stops Philly Drivers") + 
+                  theme(plot.title = element_text(hjust = 0.5))
+
+stop.coords.map <- cop.coords.map + stat_density2d(data=coord_race_district,  aes(x=lng, y=lat, fill=..level.., alpha=..level..), geom="polygon")
+
+stops.coords.map <- stop.coords.map + scale_fill_gradientn(colours=rev(brewer.pal(7, "Spectral")))
+
+bw.stops.coords.map <- stops.coords.map + 
+                        theme_bw() + 
+                        ggtitle("Police Stops Philly Drivers") + 
+                        labs(fill="Stops", alpha="Stops") + 
+                        theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(filename="/Users/mmercadodiaz/Documents/CoP /Exports/Viz/stops_heatmap.png")
+```
+
+```{r, eval= FALSE, echo=FALSE}
+plot_data <- coord_race_district %>% # Create long-format dataset for plotting
+  select(lat, lng, black_drivers, white_drivers) %>%
+  tidyr::pivot_longer(
+    cols = c(black_drivers, white_drivers),
+    names_to = "driver_type",
+    values_to = "count"
+  ) %>%
+  filter(count > 0, 
+        lat > 38,
+        lng < 76)   # keep only locations with drivers
+
+pal <- colorFactor(   #Assign colors
+  palette = c("black_drivers" = "blue", "white_drivers" = "red"),
+  domain = plot_data$driver_type)
+
+
+leaflet(plot_data) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    lng = ~lng,
+    lat = ~lat,
+    radius = ~sqrt(count),  # marker size based on count
+    color = ~pal(driver_type),
+    stroke = FALSE,
+    fillOpacity = 0.7,
+    popup = ~paste0(
+      "<b>", driver_type, "</b><br>",
+      "Count: ", count, "<br>",
+      "Latitude: ", lat, "<br>",
+      "Longitude: ", lng
+    )
+  ) %>%
+  addLegend(
+    "bottomright",
+    pal = pal,
+    values = ~driver_type,
+    title = "Driver Type",
+    opacity = 1
+  )
+
+m <- leaflet(plot_data) %>% 
+  addTiles() %>%
+  addCircleMarkers()
+
+saveWidget(m, "philly_driver_map.html", selfcontained = TRUE)
+```
+
