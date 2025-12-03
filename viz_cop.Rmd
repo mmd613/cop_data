@@ -1,0 +1,37 @@
+---
+title: "COP_2025_practice"
+author: "Mario Mercado-Diaz"
+date: "2025-12-02"
+output: html_document
+---
+
+```{r, eval= FALSE, echo=FALSE} 
+#Loading packages 
+
+library(pacman) 
+p_load(dplyr, purrr, stringr, tidyr, readxl, writexl, ggplot2, zipcodeR)
+
+```
+
+
+```{r, eval= FALSE, echo=FALSE}
+#Loading data
+
+prop_race_district <- read_excel("/Users/mmercadodiaz/Documents/CoP /Exports/Sheets/prop_race_district.xlsx")
+View(prop_race_district)
+```
+
+
+prop_race_district %>%
+ggplot(prop_race_district, mapping=aes(x=districtoccur, 
+  outline = FALSE, fill = race)) + 
+  geom_histogram(stat = "count") +
+  ylab("Arrest Rates") +
+  xlab("District") +
+  geom_density(stat = "count") + 
+  ggtitle("Arrest Rates by Race and Distict") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_viridis_d(discrete=TRUE, option="A")
+  
+  
+  
